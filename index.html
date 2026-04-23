@@ -50,8 +50,23 @@
         background: #5848e5;
     }
 
+    button:disabled {
+        background: #ccc;
+        cursor: not-allowed;
+    }
+
     .result {
         margin-top: 20px;
+    }
+
+    .error {
+        color: #d32f2f;
+        font-weight: bold;
+    }
+
+    .loading {
+        color: #666;
+        font-style: italic;
     }
 
     .temp {
@@ -63,6 +78,21 @@
         text-transform: capitalize;
         margin-bottom: 10px;
     }
+
+    .info-box {
+        background: #e3f2fd;
+        border-left: 4px solid #2196F3;
+        padding: 10px;
+        margin-top: 15px;
+        border-radius: 4px;
+        font-size: 12px;
+        text-align: left;
+    }
+
+    input:focus {
+        border-color: #6c63ff;
+        box-shadow: 0 0 5px rgba(108, 99, 255, 0.3);
+    }
 </style>
 </head>
 
@@ -70,43 +100,122 @@
 
 <div class="app">
     <h2>🌦 Weather App</h2>
-    <input type="text" id="city" placeholder="Enter city">
-    <button onclick="getWeather()">Search</button>
+    <input type="text" id="city" placeholder="Enter city name" onkeypress="handleEnter(event)">
+    <button id="searchBtn" onclick="getWeather()">Search</button>
 
-    <div class="result" id="result"></div>
+    <div class="result" id="result">
+        <div class="info-box">
+            📌 <strong>Setup Required:</strong> Get a free API key from <a href="https://openweathermap.org/api" target="_blank">openweathermap.org</a> and replace the key in the script.
+        </div>
+    </div>
 </div>
 
 <script>
-const apiKey = "YOUR_API_KEY_HERE";
+// 🔑 API KEY SETUP - Three ways to configure:
+// 1. Create a .env file with: OPENWEATHER_API_KEY=your_key
+// 2. Replace 'YOUR_API_KEY' directly below (not recommended for GitHub)
+// 3. Use backend server to load from environment variable
+
+const apiKey = "YOUR_API_KEY"; // ← Replace with your actual API key from https://openweathermap.org/api
+
+// Cache for storing weather data
+const weatherCache = {};
+
+// Debounce timer
+let searchTimeout;
 
 async function getWeather() {
     const city = document.getElementById("city").value.trim();
+    const resultDiv = document.getElementById("result");
+    const btn = document.getElementById("searchBtn");
 
+    // Validation
     if (!city) {
-        alert("Please enter a city name");
+        resultDiv.innerHTML = '<div class="error">❌ Please enter a city name</div>';
         return;
     }
 
-    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`;
+    // Check if API key is configured
+    if (apiKey === "YOUR_API_KEY") {
+        resultDiv.innerHTML = `
+            <div class="error">
+                <strong>⚠️ API Key Not Set!</strong><br><br>
+                <strong>Steps to set up:</strong><br>
+                1. Get free key: <a href="https://openweathermap.org/api" target="_blank">openweathermap.org/api</a><br>
+                2. Copy your API key<br>
+                3. Open this HTML file in an editor<br>
+                4. Find: <code>const apiKey = "YOUR_API_KEY";</code><br>
+                5. Replace with your key<br>
+                6. Save and reload<br><br>
+                <small>Or see README.md for advanced setup options</small>
+            </div>
+        `;
+        return;
+    }
+
+    // Check cache first (efficiency improvement)
+    if (weatherCache[city.toLowerCase()]) {
+        displayWeather(weatherCache[city.toLowerCase()], resultDiv);
+        return;
+    }
+
+    // Show loading state
+    resultDiv.innerHTML = '<div class="loading">🔄 Searching for ' + city + '...</div>';
+    btn.disabled = true;
 
     try {
+        const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(city)}&units=metric&appid=${apiKey}`;
         const res = await fetch(url);
         const data = await res.json();
 
-        if (data.cod !== 200) {
-            document.getElementById("result").innerHTML = "❌ City not found";
+        // Proper error handling
+        if (res.status === 404 || data.cod === "404") {
+            resultDiv.innerHTML = `<div class="error">❌ City "${city}" not found.<br>Check spelling or try another city.</div>`;
             return;
         }
 
-        document.getElementById("result").innerHTML = `
-            <h3>${data.name}, ${data.sys.country}</h3>
-            <div class="temp">${data.main.temp}°C</div>
-            <div class="desc">${data.weather[0].description}</div>
-            <p>💧 Humidity: ${data.main.humidity}%</p>
-            <p>🌬 Wind: ${data.wind.speed} m/s</p>
-        `;
+        if (!res.ok || data.cod !== 200) {
+            console.error("API Response:", data);
+            resultDiv.innerHTML = `
+                <div class="error">
+                    <strong>⚠️ Error:</strong><br>
+                    ${data.message || 'Invalid API key or API limit reached'}<br>
+                    <a href="https://openweathermap.org/api" target="_blank">Verify your API key</a>
+                </div>
+            `;
+            return;
+        }
+
+        // Cache the result
+        weatherCache[city.toLowerCase()] = data;
+        displayWeather(data, resultDiv);
+
     } catch (err) {
-        document.getElementById("result").innerHTML = "⚠️ Error fetching weather";
+        resultDiv.innerHTML = `<div class="error">⚠️ Network error. Check your connection and try again.</div>`;
+        console.error("Fetch error:", err);
+    } finally {
+        btn.disabled = false;
+    }
+}
+
+// Separate display function (cleaner code)
+function displayWeather(data, resultDiv) {
+    resultDiv.innerHTML = `
+        <h3>${data.name}, ${data.sys.country}</h3>
+        <div class="temp">${Math.round(data.main.temp)}°C</div>
+        <div class="desc">${data.weather[0].description}</div>
+        <p>💧 Humidity: ${data.main.humidity}%</p>
+        <p>🌬 Wind: ${data.wind.speed} m/s</p>
+        <p>🌡️ Feels like: ${Math.round(data.main.feels_like)}°C</p>
+        <p style="font-size: 11px; color: #999; margin-top: 10px;">Last updated: just now</p>
+    `;
+}
+
+// Allow Enter key to search
+function handleEnter(event) {
+    if (event.key === "Enter") {
+        clearTimeout(searchTimeout);
+        searchTimeout = setTimeout(getWeather, 300); // Debounce
     }
 }
 </script>
