@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Weather App</title>
+
+<style>
+    body {
+        margin: 0;
+        font-family: 'Segoe UI', sans-serif;
+        background: linear-gradient(135deg, #74ebd5, #9face6);
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+
+    .app {
+        background: white;
+        padding: 25px;
+        border-radius: 15px;
+        width: 320px;
+        text-align: center;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+
+    h2 {
+        margin-bottom: 15px;
+    }
+
+    input {
+        width: 70%;
+        padding: 10px;
+        border-radius: 8px;
+        border: 1px solid #ccc;
+        outline: none;
+    }
+
+    button {
+        padding: 10px 12px;
+        border: none;
+        background: #6c63ff;
+        color: white;
+        border-radius: 8px;
+        cursor: pointer;
+    }
+
+    button:hover {
+        background: #5848e5;
+    }
+
+    .result {
+        margin-top: 20px;
+    }
+
+    .temp {
+        font-size: 32px;
+        font-weight: bold;
+    }
+
+    .desc {
+        text-transform: capitalize;
+        margin-bottom: 10px;
+    }
+</style>
+</head>
+
+<body>
+
+<div class="app">
+    <h2>🌦 Weather App</h2>
+    <input type="text" id="city" placeholder="Enter city">
+    <button onclick="getWeather()">Search</button>
+
+    <div class="result" id="result"></div>
+</div>
+
+<script>
+const apiKey = "YOUR_API_KEY_HERE";
+
+async function getWeather() {
+    const city = document.getElementById("city").value.trim();
+
+    if (!city) {
+        alert("Please enter a city name");
+        return;
+    }
+
+    const url = `https://api.openweathermap.org/data/2.5/weather?q=${city}&units=metric&appid=${apiKey}`;
+
+    try {
+        const res = await fetch(url);
+        const data = await res.json();
+
+        if (data.cod !== 200) {
+            document.getElementById("result").innerHTML = "❌ City not found";
+            return;
+        }
+
+        document.getElementById("result").innerHTML = `
+            <h3>${data.name}, ${data.sys.country}</h3>
+            <div class="temp">${data.main.temp}°C</div>
+            <div class="desc">${data.weather[0].description}</div>
+            <p>💧 Humidity: ${data.main.humidity}%</p>
+            <p>🌬 Wind: ${data.wind.speed} m/s</p>
+        `;
+    } catch (err) {
+        document.getElementById("result").innerHTML = "⚠️ Error fetching weather";
+    }
+}
+</script>
+
+</body>
+</html>
